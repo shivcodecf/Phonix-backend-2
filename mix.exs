@@ -40,7 +40,8 @@ defmodule ChatServer.MixProject do
       {:plug_cowboy, "~> 2.6"},         
       {:finch, "~> 0.13"},          
       {:joken, "~> 2.6"},
-      {:stagger, "~> 0.1.7"},
+      {:stagger, github: "ausimian/stagger", branch: "main"}, 
+      {:gen_stage, "~> 1.2"},
       {:cors_plug, "~> 3.0"}      
     ]
   end

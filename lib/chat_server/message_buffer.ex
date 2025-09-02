@@ -20,10 +20,12 @@ defmodule ChatServer.MessageBuffer do
     if q != [] do
       batch = Enum.take(q, @batch_size)
       rest = Enum.drop(q, @batch_size)
-      send_batch_to_supabase(batch)
-      state = %{state | queue: rest}
+
+      # ✅ spawn async task to send batch
+      Task.start(fn -> send_batch_to_supabase(batch) end)
+
       Process.send_after(self(), :flush, @flush_interval)
-      {:noreply, state}
+      {:noreply, %{state | queue: rest}}
     else
       Process.send_after(self(), :flush, @flush_interval)
       {:noreply, state}
@@ -31,18 +33,28 @@ defmodule ChatServer.MessageBuffer do
   end
 
   defp send_batch_to_supabase(messages) do
-    Task.start(fn ->
-      url = "#{Application.fetch_env!(:chat_server, :supabase_url)}/functions/v1/write_batch"
-      key = Application.fetch_env!(:chat_server, :supabase_service_key)
+    url     = "#{Application.fetch_env!(:chat_server, :supabase_url)}/functions/v1/write_batch"
+    secret  = Application.fetch_env!(:chat_server, :edge_function_secret)
+    service = Application.fetch_env!(:chat_server, :supabase_service_key)
 
-      headers = [
-        {"Content-Type", "application/json"},
-        {"Authorization", "Bearer #{key}"},
-        {"apikey", key}
-      ]
+    headers = [
+      {"Content-Type", "application/json"},
+      {"x-secret", secret},                             # custom auth check inside your Edge Function
+      {"Authorization", "Bearer " <> service},          # required by Supabase gateway
+      {"apikey", service}                               # required by Supabase gateway
+    ]
 
-      body = Jason.encode!(%{messages: messages})
-      Finch.build(:post, url, headers, body) |> Finch.request(ChatServerFinch)
-    end)
+    body = Jason.encode!(%{messages: messages})
+
+    case Finch.build(:post, url, headers, body) |> Finch.request(ChatServerFinch) do
+      {:ok, %Finch.Response{status: 200, body: body}} ->
+        IO.puts("✅ Batch persisted: #{body}")
+
+      {:ok, %Finch.Response{status: code, body: body}} ->
+        IO.puts("❌ Failed to persist batch (#{code}): #{body}")
+
+      {:error, err} ->
+        IO.puts("❌ Error sending batch: #{inspect(err)}")
+    end
   end
 end

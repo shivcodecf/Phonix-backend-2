@@ -5,7 +5,7 @@ defmodule ChatServerWeb.ChatChannel do
   def join("chat:" <> chat_id, _params, socket) do
     user_id = socket.assigns[:user_id]
 
-    # Ensure membership exists
+    # Ensure membership exists (safe)
     ensure_membership(chat_id, user_id)
 
     # Track presence after join
@@ -18,13 +18,11 @@ defmodule ChatServerWeb.ChatChannel do
   def handle_info(:after_join, socket) do
     user_id = socket.assigns[:user_id]
 
-    # Track this user in Presence
     {:ok, _} =
       Presence.track(socket, user_id, %{
         online_at: System.system_time(:second)
       })
 
-    # Push the full presence state to this user
     push(socket, "presence_state", Presence.list(socket))
 
     {:noreply, socket}
@@ -35,7 +33,6 @@ defmodule ChatServerWeb.ChatChannel do
     user_id = socket.assigns[:user_id]
     chat_id = socket.assigns[:chat_id]
 
-    # Build message
     msg = %{
       chat_id: chat_id,
       sender_id: user_id,
@@ -43,45 +40,48 @@ defmodule ChatServerWeb.ChatChannel do
       inserted_at: DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
-    # Broadcast to everyone in the room
     broadcast!(socket, "new_message", msg)
-
-    # Persist in Supabase
-    persist_message(msg)
+    ChatServer.MessageBuffer.enqueue(msg)
 
     {:noreply, socket}
   end
 
-  defp persist_message(msg) do
-    url = Application.fetch_env!(:chat_server, :supabase_url) <> "/rest/v1/messages"
-
-    headers = [
-      {"apikey", Application.fetch_env!(:chat_server, :supabase_service_key)},
-      {"Authorization", "Bearer " <> Application.fetch_env!(:chat_server, :supabase_service_key)},
-      {"Content-Type", "application/json"}
-    ]
-
-    body = Jason.encode!(msg)
-
-    Finch.build(:post, url, headers, body)
-    |> Finch.request(ChatServerFinch)
-  end
+  # 👇 Safer ensure_membership
+  defp ensure_membership(nil, _), do: :noop
+  defp ensure_membership(_, nil), do: :noop
 
   defp ensure_membership(chat_id, user_id) do
-    url = Application.fetch_env!(:chat_server, :supabase_url) <> "/rest/v1/chat_members"
+    env = Application.get_all_env(:chat_server)
+    IO.inspect(env, label: "⚡ ChatServer ENV")
 
-    headers = [
-      {"apikey", Application.fetch_env!(:chat_server, :supabase_service_key)},
-      {"Authorization", "Bearer " <> Application.fetch_env!(:chat_server, :supabase_service_key)},
-      {"Content-Type", "application/json"}
-    ]
+    supabase_url = Keyword.get(env, :supabase_url)
+    service_key  = Keyword.get(env, :supabase_service_key)
 
-    body = Jason.encode!(%{
-      chat_id: chat_id,
-      user_id: user_id
-    })
+    if supabase_url && service_key do
+      url = supabase_url <> "/rest/v1/chat_members"
 
-    Finch.build(:post, url, headers, body)
-    |> Finch.request(ChatServerFinch)
+      headers = [
+        {"apikey", service_key},
+        {"Authorization", "Bearer " <> service_key},
+        {"Content-Type", "application/json"}
+      ]
+
+      body = Jason.encode!(%{chat_id: chat_id, user_id: user_id})
+
+      Finch.build(:post, url, headers, body)
+      |> Finch.request(ChatServerFinch)
+      |> case do
+        {:ok, %Finch.Response{status: 201}} ->
+          IO.puts("✅ Membership ensured for user #{user_id} in chat #{chat_id}")
+
+        {:ok, %Finch.Response{status: code, body: body}} ->
+          IO.puts("❌ Failed to ensure membership (#{code}): #{body}")
+
+        {:error, err} ->
+          IO.puts("❌ Error ensuring membership: #{inspect(err)}")
+      end
+    else
+      IO.puts("❌ Supabase config missing! supabase_url=#{inspect(supabase_url)} service_key=#{inspect(service_key)}")
+    end
   end
 end

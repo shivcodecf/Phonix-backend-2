@@ -14,11 +14,11 @@ config :chat_server, ChatServerWeb.Endpoint,
 config :chat_server,
   supabase_url: "https://psvhvupdhtzglueldsze.supabase.co",
   supabase_anon_key: System.get_env("SUPABASE_ANON_KEY"),
-  supabase_service_key: System.get_env("SUPABASE_SERVICE_KEY"),
-  supabase_jwt_secret: System.get_env("SUPABASE_JWT_SECRET")
+  supabase_service_key: System.get_env("SUPABASE_SERVICE_KEY"),   
+  supabase_jwt_secret: System.get_env("SUPABASE_JWT_SECRET"),
+  edge_function_secret: "ehdecgegedvegdedgevdegdvegdevdgedhdehd"
 
-
-# Swoosh — disable email client since you don’t need it
+# Swoosh — disable email client
 config :swoosh, :api_client, false
 
 # Logger
@@ -29,5 +29,5 @@ config :logger, :console,
 # Use Jason for JSON parsing
 config :phoenix, :json_library, Jason
 
+# Import environment specific configs
 import_config "#{config_env()}.exs"
-

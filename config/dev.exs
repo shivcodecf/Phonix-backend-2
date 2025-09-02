@@ -22,3 +22,11 @@ config :phoenix, :plug_init_mode, :runtime
 
 # Disable swoosh API client (emails) in dev
 config :swoosh, :api_client, false
+
+# ✅ Add Supabase + Edge secret config
+config :chat_server,
+  supabase_url: "https://psvhvupdhtzglueldsze.supabase.co",
+  supabase_anon_key: System.get_env("SUPABASE_ANON_KEY"),
+  supabase_service_key: System.get_env("SUPABASE_SERVICE_KEY"),
+  supabase_jwt_secret: System.get_env("SUPABASE_JWT_SECRET"),
+  edge_function_secret: "ehdecgegedvegdedgevdegdvegdevdgedhdehd"

@@ -16,9 +16,10 @@ config :logger, level: :info
 # Disable dev routes in prod
 config :chat_server, dev_routes: false
 
-# ✅ Add Supabase credentials here
+# ✅ Supabase credentials (production-safe)
 config :chat_server,
-  supabase_url: System.get_env("SUPABASE_URL"),
+supabase_url: "https://psvhvupdhtzglueldsze.supabase.co",
   supabase_anon_key: System.get_env("SUPABASE_ANON_KEY"),
-  supabase_service_key: System.get_env("SUPABASE_SERVICE_KEY"),
-  supabase_jwt_secret: System.get_env("SUPABASE_JWT_SECRET")
+  supabase_service_key: System.get_env("SUPABASE_SERVICE_KEY"), 
+  supabase_jwt_secret: System.get_env("SUPABASE_JWT_SECRET"),
+  edge_function_secret: "ehdecgegedvegdedgevdegdvegdevdgedhdehd"      

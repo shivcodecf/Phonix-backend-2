@@ -8,9 +8,10 @@ defmodule ChatServer.Application do
       ChatServerWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:chat_server, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: ChatServer.PubSub},
-      {Finch, name: ChatServerFinch}, # ✅ for Supabase HTTP requests
-      ChatServerWeb.Endpoint,
-       ChatServerWeb.Presence
+      {Finch, name: ChatServerFinch},          # ✅ for Supabase HTTP requests
+      ChatServer.MessageBuffer,                # ✅ start the durable message buffer
+      ChatServerWeb.Presence,                  # ✅ track online users
+      ChatServerWeb.Endpoint                   # ✅ must be after Presence
     ]
 
     opts = [strategy: :one_for_one, name: ChatServer.Supervisor]
