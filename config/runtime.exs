@@ -6,11 +6,11 @@ end
 
 # ✅ Load Supabase + Edge secrets in ALL environments
 config :chat_server,
-  supabase_url: "https://psvhvupdhtzglueldsze.supabase.co",
+  supabase_url: System.get_env("SUPABASE_URL") || raise("SUPABASE_URL missing"),
   supabase_anon_key: System.get_env("SUPABASE_ANON_KEY") || raise("SUPABASE_ANON_KEY missing"),
   supabase_service_key: System.get_env("SUPABASE_SERVICE_KEY") || raise("SUPABASE_SERVICE_KEY missing"),
   supabase_jwt_secret: System.get_env("SUPABASE_JWT_SECRET") || raise("SUPABASE_JWT_SECRET missing"),
-  edge_function_secret: "ehdecgegedvegdedgevdegdvegdevdgedhdehd"
+  edge_function_secret: System.get_env("EDGE_FUNCTION_SECRET") || raise("EDGE_FUNCTION_SECRET missing")
 
 if config_env() == :prod do
   database_url =

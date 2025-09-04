@@ -2,23 +2,27 @@ import Config
 
 # Phoenix Endpoint (base setup)
 config :chat_server, ChatServerWeb.Endpoint,
-  url: [host: "localhost"],
+  url: [
+    host: System.get_env("PHX_HOST") || "localhost",
+    scheme: "https",
+    port: 443
+  ],
   render_errors: [
     formats: [json: ChatServerWeb.ErrorJSON],
     layout: false
   ],
   pubsub_server: ChatServer.PubSub,
-  live_view: [signing_salt: "yoursalt"]
+  live_view: [signing_salt: System.get_env("LIVE_VIEW_SALT") || "changeme"]
 
 # Supabase integration
 config :chat_server,
-  supabase_url: "https://psvhvupdhtzglueldsze.supabase.co",
+  supabase_url: System.get_env("SUPABASE_URL") || "https://psvhvupdhtzglueldsze.supabase.co",
   supabase_anon_key: System.get_env("SUPABASE_ANON_KEY"),
-  supabase_service_key: System.get_env("SUPABASE_SERVICE_KEY"),   
+  supabase_service_key: System.get_env("SUPABASE_SERVICE_KEY"),
   supabase_jwt_secret: System.get_env("SUPABASE_JWT_SECRET"),
-  edge_function_secret: "ehdecgegedvegdedgevdegdvegdevdgedhdehd"
+  edge_function_secret: System.get_env("EDGE_FUNCTION_SECRET")
 
-# Swoosh — disable email client
+# Swoosh — disable email client in dev/prod if not needed
 config :swoosh, :api_client, false
 
 # Logger

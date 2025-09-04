@@ -1,12 +1,12 @@
 import Config
 
 config :chat_server, ChatServerWeb.Endpoint,
-  # Bind only to localhost (127.0.0.1). Change to {0,0,0,0} if you want access from other devices.
+  # Bind to localhost only in dev
   http: [ip: {127, 0, 0, 1}, port: 4000],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: "dev-secret-key",
+  secret_key_base: "dev-secret-key",   # Only for local dev
   watchers: [],
   server: true  
 
@@ -23,10 +23,10 @@ config :phoenix, :plug_init_mode, :runtime
 # Disable swoosh API client (emails) in dev
 config :swoosh, :api_client, false
 
-# ✅ Add Supabase + Edge secret config
+# ✅ Supabase keys in dev (safe defaults or dummy values)
 config :chat_server,
   supabase_url: "https://psvhvupdhtzglueldsze.supabase.co",
-  supabase_anon_key: System.get_env("SUPABASE_ANON_KEY"),
-  supabase_service_key: System.get_env("SUPABASE_SERVICE_KEY"),
-  supabase_jwt_secret: System.get_env("SUPABASE_JWT_SECRET"),
-  edge_function_secret: "ehdecgegedvegdedgevdegdvegdevdgedhdehd"
+  supabase_anon_key: System.get_env("SUPABASE_ANON_KEY") || "dev-anon-key",
+  supabase_service_key: System.get_env("SUPABASE_SERVICE_KEY") || "dev-service-key",
+  supabase_jwt_secret: System.get_env("SUPABASE_JWT_SECRET") || "dev-jwt-secret",
+  edge_function_secret: System.get_env("EDGE_FUNCTION_SECRET") || "dev-edge-secret"
