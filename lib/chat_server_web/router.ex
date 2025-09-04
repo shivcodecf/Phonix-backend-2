@@ -1,29 +1,34 @@
-pipeline :api do
-  plug :accepts, ["json"]
-end
+defmodule ChatServerWeb.Router do
+  use ChatServerWeb, :router
 
-pipeline :api_auth do
-  plug :accepts, ["json"]
-  plug ChatServerWeb.AuthPlug
-end
+  # Pipelines
+  pipeline :api do
+    plug :accepts, ["json"]
+  end
 
-# Public health
-scope "/" do
-  get "/health", ChatServerWeb.HealthController, :index
-end
+  pipeline :api_auth do
+    plug :accepts, ["json"]
+    plug ChatServerWeb.AuthPlug
+  end
 
-# Public (if any)
-scope "/api", ChatServerWeb do
-  pipe_through :api
-  # e.g., public endpoints here
-end
+  # Public health check
+  scope "/" do
+    get "/health", ChatServerWeb.HealthController, :index
+  end
 
-# Protected
-scope "/api", ChatServerWeb do
-  pipe_through :api_auth
+  # (Optional) Public API routes go here
+  # scope "/api", ChatServerWeb do
+  #   pipe_through :api
+  #   get "/status", StatusController, :index
+  # end
 
-  get  "/history",     HistoryController, :history
-  post "/create_chat", ChatController,    :create
-  post "/invite",      ChatController,    :invite
-  get  "/my_chats",    ChatController,    :my_chats
+  # Protected API routes (require Authorization: Bearer <JWT>)
+  scope "/api", ChatServerWeb do
+    pipe_through :api_auth
+
+    get  "/history",     HistoryController, :history
+    post "/create_chat", ChatController,    :create
+    post "/invite",      ChatController,    :invite
+    get  "/my_chats",    ChatController,    :my_chats
+  end
 end
