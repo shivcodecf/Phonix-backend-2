@@ -9,10 +9,15 @@ defmodule ChatServerWeb.ChatController do
       |> List.first()
       |> to_string()
       |> String.replace("Bearer ", "")
+      
+
 
     url = Application.fetch_env!(:chat_server, :supabase_url) <> "/rest/v1/chats"
 
-    body = Jason.encode!(%{name: name})
+
+    body = Jason.encode!(%{name: name}) 
+
+
 
     headers = [
       {"apikey", Application.fetch_env!(:chat_server, :supabase_service_key)},
@@ -20,6 +25,8 @@ defmodule ChatServerWeb.ChatController do
       {"Content-Type", "application/json"},
       {"Prefer", "return=representation"}
     ]
+
+
 
     case Finch.build(:post, url, headers, body) |> Finch.request(ChatServerFinch) do
       {:ok, %Finch.Response{status: 201, body: body}} ->

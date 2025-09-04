@@ -13,7 +13,7 @@ defmodule ChatServer.MessageBuffer do
   end
 
   def handle_cast({:enqueue, msg}, %{queue: q} = state) do
-    {:noreply, %{state | queue: [msg | q]}}
+    {:noreply, %{state | queue: [msg | q]}} 
   end
 
   def handle_info(:flush, %{queue: q} = state) do
