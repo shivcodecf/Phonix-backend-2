@@ -2,19 +2,21 @@ defmodule ChatServerWeb.ChatChannel do
   use Phoenix.Channel
   alias ChatServerWeb.Presence
 
+  @max_msg_len 4000
+
   def join("chat:" <> chat_id, _params, socket) do
-    user_id = socket.assigns[:user_id]
+    case socket.assigns[:user_id] do
+      nil ->
+        {:error, %{reason: "unauthorized"}}
 
-    # Ensure membership exists (safe)
-    ensure_membership(chat_id, user_id)
-
-    # Track presence after join
-    send(self(), :after_join)
-
-    {:ok, assign(socket, :chat_id, chat_id)}
+      user_id ->
+        # kick off membership ensure asynchronously (don’t block join)
+        Task.start(fn -> ensure_membership(chat_id, user_id) end)
+        send(self(), :after_join)
+        {:ok, assign(socket, :chat_id, chat_id)}
+    end
   end
 
-  # Handle presence after join
   def handle_info(:after_join, socket) do
     user_id = socket.assigns[:user_id]
 
@@ -24,64 +26,80 @@ defmodule ChatServerWeb.ChatChannel do
       })
 
     push(socket, "presence_state", Presence.list(socket))
-
     {:noreply, socket}
   end
 
-  # 👇 Handle incoming messages
-  def handle_in("new_message", %{"content" => content}, socket) do
-    user_id = socket.assigns[:user_id]
-    chat_id = socket.assigns[:chat_id]
+  # new_message handler with simple validation
+  def handle_in("new_message", %{"content" => content}, socket) when is_binary(content) do
+    content = String.trim(content)
 
-    msg = %{
-      chat_id: chat_id,
-      sender_id: user_id,
-      content: content,
-      inserted_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    }
+    cond do
+      content == "" ->
+        {:reply, {:error, %{error: "empty_message"}}, socket}
 
-    broadcast!(socket, "new_message", msg)
-    ChatServer.MessageBuffer.enqueue(msg)
+      String.length(content) > @max_msg_len ->
+        {:reply, {:error, %{error: "message_too_long"}}, socket}
 
-    {:noreply, socket}
+      true ->
+        user_id = socket.assigns[:user_id]
+        chat_id = socket.assigns[:chat_id]
+
+        msg = %{
+          chat_id: chat_id,
+          sender_id: user_id,
+          content: content,
+          inserted_at: DateTime.utc_now() |> DateTime.to_iso8601()
+        }
+
+        broadcast!(socket, "new_message", msg)
+        ChatServer.MessageBuffer.enqueue(msg)
+        {:noreply, socket}
+    end
   end
 
-  # 👇 Safer ensure_membership
+  def handle_in("new_message", _params, socket) do
+    {:reply, {:error, %{error: "invalid_payload"}}, socket}
+  end
+
+  # ---- helpers ----
+
   defp ensure_membership(nil, _), do: :noop
   defp ensure_membership(_, nil), do: :noop
 
   defp ensure_membership(chat_id, user_id) do
-    env = Application.get_all_env(:chat_server)
-    IO.inspect(env, label: "⚡ ChatServer ENV")
+    # Pull just what we need (don’t log secrets)
+    supabase_url = Application.get_env(:chat_server, :supabase_url)
+    service_key  = Application.get_env(:chat_server, :supabase_service_key)
 
-    supabase_url = Keyword.get(env, :supabase_url)
-    service_key  = Keyword.get(env, :supabase_service_key)
-
-    if supabase_url && service_key do
+    with true <- is_binary(supabase_url) and is_binary(service_key) do
       url = supabase_url <> "/rest/v1/chat_members"
 
       headers = [
         {"apikey", service_key},
         {"Authorization", "Bearer " <> service_key},
-        {"Content-Type", "application/json"}
+        {"Content-Type", "application/json"},
+        {"Prefer", "resolution=ignore-duplicates"}     # avoids 409 on existing
       ]
 
       body = Jason.encode!(%{chat_id: chat_id, user_id: user_id})
 
-      Finch.build(:post, url, headers, body)
-      |> Finch.request(ChatServerFinch)
-      |> case do
+      req =
+        Finch.build(:post, url, headers, body)
+        |> then(&Finch.request(&1, ChatServerFinch, receive_timeout: 5_000, pool_timeout: 2_000))
+
+      case req do
         {:ok, %Finch.Response{status: 201}} ->
-          IO.puts("✅ Membership ensured for user #{user_id} in chat #{chat_id}")
+          :ok
 
         {:ok, %Finch.Response{status: code, body: body}} ->
-          IO.puts("❌ Failed to ensure membership (#{code}): #{body}")
+          # log minimal info; don’t leak secrets
+          IO.warn("ensure_membership failed status=#{code} body=#{inspect(body)}")
 
         {:error, err} ->
-          IO.puts("❌ Error ensuring membership: #{inspect(err)}")
+          IO.warn("ensure_membership http_error=#{inspect(err)}")
       end
     else
-      IO.puts("❌ Supabase config missing! supabase_url=#{inspect(supabase_url)} service_key=#{inspect(service_key)}")
+      _ -> IO.warn("Supabase config missing (supabase_url/service_key)")
     end
   end
 end

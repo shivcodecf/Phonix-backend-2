@@ -9,6 +9,21 @@ defmodule ChatServerWeb.Endpoint do
     secure: config_env() == :prod
   ]
 
+  # Compute WS origin opts at compile time
+  @ws_origin_opts if Mix.env() == :prod,
+                    do: [check_origin: [System.get_env("PHX_HOST")]],
+                    else: []
+
+  # Compute CORS origins at compile time (ENV read is fine here)
+  @cors_origins case Mix.env() do
+                  :prod ->
+                    System.get_env("CORS_ORIGINS")
+                    |> to_string()
+                    |> String.split(~r/\s*,\s*/, trim: true)
+                  _ ->
+                    ["http://localhost:5173"]
+                end
+
   # Static assets
   plug Plug.Static,
     at: "/",
@@ -32,18 +47,11 @@ defmodule ChatServerWeb.Endpoint do
 
   # WebSockets
   socket "/socket", ChatServerWeb.UserSocket,
-    websocket:
-      if config_env() == :prod do
-        [check_origin: [System.get_env("PHX_HOST")]]
-      else
-        true
-      end,
+    websocket: (if @ws_origin_opts == [], do: true, else: @ws_origin_opts),
     longpoll: false
 
   socket "/live", Phoenix.LiveView.Socket,
-    websocket:
-      [connect_info: [session: @session_options]] ++
-        if config_env() == :prod, do: [check_origin: [System.get_env("PHX_HOST")]], else: [],
+    websocket: [connect_info: [session: @session_options]] ++ @ws_origin_opts,
     longpoll: false
 
   plug Plug.RequestId
@@ -59,13 +67,7 @@ defmodule ChatServerWeb.Endpoint do
   plug Plug.Session, @session_options
 
   # CORS (env-based)
-  origins =
-    case config_env() do
-      :prod -> String.split(System.get_env("CORS_ORIGINS") || "", ~r/\s*,\s*/, trim: true)
-      _ -> ["http://localhost:5173"]
-    end
-
-  plug CORSPlug, origin: origins
+  plug CORSPlug, origin: @cors_origins
 
   plug ChatServerWeb.Router
 end
