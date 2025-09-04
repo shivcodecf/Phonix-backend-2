@@ -24,25 +24,25 @@ defmodule ChatServer.MixProject do
   defp elixirc_paths(_), do: ["lib"]
 
   defp deps do
-    [
-      {:phoenix, "~> 1.8.1"},
-      {:phoenix_pubsub, "~> 2.1"},
-      {:phoenix_live_dashboard, "~> 0.8.3"},   # dev only (protect in prod)
-      {:swoosh, "~> 1.16"},
-      {:req, "~> 0.5"},
-      {:telemetry_metrics, "~> 1.0"},
-      {:telemetry_poller, "~> 1.0"},
-      {:gettext, "~> 0.26"},
-      {:jason, "~> 1.2"},
-      {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"},                     # ✅ Bandit as HTTP server
-      {:finch, "~> 0.13"},          
-      {:joken, "~> 2.6"},
-      {:stagger, github: "ausimian/stagger", branch: "main"},
-      {:gen_stage, "~> 1.2"},
-      {:cors_plug, "~> 3.0"}
-    ]
-  end
+  [
+    {:phoenix, "~> 1.8.1"},
+    {:phoenix_pubsub, "~> 2.1"},
+    {:phoenix_live_dashboard, "~> 0.8.3", only: :dev}, # ✅ dev only
+    {:swoosh, "~> 1.16"},
+    {:req, "~> 0.5"},
+    {:telemetry_metrics, "~> 1.0"},
+    {:telemetry_poller, "~> 1.0"},
+    {:gettext, "~> 0.26"},
+    {:jason, "~> 1.2"},
+    {:dns_cluster, "~> 0.2.0"},
+    {:bandit, "~> 1.5"},         # ✅ only server adapter now
+    {:finch, "~> 0.13"},
+    {:joken, "~> 2.6"},
+    {:stagger, github: "ausimian/stagger", branch: "main"},
+    {:gen_stage, "~> 1.2"},
+    {:cors_plug, "~> 3.0"}
+  ]
+end
 
   defp aliases do
     [
