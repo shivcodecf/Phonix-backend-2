@@ -4,19 +4,24 @@ defmodule ChatServerWeb.ChatChannel do
 
   @max_msg_len 4000
 
+  @impl true
   def join("chat:" <> chat_id, _params, socket) do
     case socket.assigns[:user_id] do
       nil ->
         {:error, %{reason: "unauthorized"}}
 
       user_id ->
-        # kick off membership ensure asynchronously (don’t block join)
-        Task.start(fn -> ensure_membership(chat_id, user_id) end)
+        # TODO: optionally verify they already belong to this chat_id before allowing join.
+        Task.Supervisor.start_child(ChatServer.TaskSup, fn ->
+          ensure_membership(chat_id, user_id)
+        end)
+
         send(self(), :after_join)
         {:ok, assign(socket, :chat_id, chat_id)}
     end
   end
 
+  @impl true
   def handle_info(:after_join, socket) do
     user_id = socket.assigns[:user_id]
 
@@ -29,7 +34,7 @@ defmodule ChatServerWeb.ChatChannel do
     {:noreply, socket}
   end
 
-  # new_message handler with simple validation
+  @impl true
   def handle_in("new_message", %{"content" => content}, socket) when is_binary(content) do
     content = String.trim(content)
 
@@ -57,6 +62,7 @@ defmodule ChatServerWeb.ChatChannel do
     end
   end
 
+  @impl true
   def handle_in("new_message", _params, socket) do
     {:reply, {:error, %{error: "invalid_payload"}}, socket}
   end
@@ -67,7 +73,6 @@ defmodule ChatServerWeb.ChatChannel do
   defp ensure_membership(_, nil), do: :noop
 
   defp ensure_membership(chat_id, user_id) do
-    # Pull just what we need (don’t log secrets)
     supabase_url = Application.get_env(:chat_server, :supabase_url)
     service_key  = Application.get_env(:chat_server, :supabase_service_key)
 
@@ -78,23 +83,17 @@ defmodule ChatServerWeb.ChatChannel do
         {"apikey", service_key},
         {"Authorization", "Bearer " <> service_key},
         {"Content-Type", "application/json"},
-        {"Prefer", "resolution=ignore-duplicates"}     # avoids 409 on existing
+        {"Prefer", "resolution=ignore-duplicates"}
       ]
 
       body = Jason.encode!(%{chat_id: chat_id, user_id: user_id})
 
-      req =
-        Finch.build(:post, url, headers, body)
-        |> then(&Finch.request(&1, ChatServerFinch, receive_timeout: 5_000, pool_timeout: 2_000))
-
-      case req do
-        {:ok, %Finch.Response{status: 201}} ->
-          :ok
-
+      Finch.build(:post, url, headers, body)
+      |> Finch.request(ChatServerFinch, receive_timeout: 5_000, pool_timeout: 2_000)
+      |> case do
+        {:ok, %Finch.Response{status: 201}} -> :ok
         {:ok, %Finch.Response{status: code, body: body}} ->
-          # log minimal info; don’t leak secrets
           IO.warn("ensure_membership failed status=#{code} body=#{inspect(body)}")
-
         {:error, err} ->
           IO.warn("ensure_membership http_error=#{inspect(err)}")
       end

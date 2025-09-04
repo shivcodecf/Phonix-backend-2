@@ -1,26 +1,28 @@
 defmodule ChatServerWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :chat_server
 
+  # Compile-time env flag (safe in releases)
+  @is_prod Mix.env() == :prod
+
   @session_options [
     store: :cookie,
     key: "_chat_server_key",
     signing_salt: "UAUXXkdQ",
     same_site: "Lax",
-    secure: config_env() == :prod
+    secure: @is_prod
   ]
 
   # Compute WS origin opts at compile time
-  @ws_origin_opts if Mix.env() == :prod,
-                    do: [check_origin: [System.get_env("PHX_HOST")]],
-                    else: []
+  @ws_origin_opts if @is_prod, do: [check_origin: [System.get_env("PHX_HOST")]], else: []
 
-  # Compute CORS origins at compile time (ENV read is fine here)
-  @cors_origins case Mix.env() do
-                  :prod ->
+  # Compute CORS origins at compile time
+  @cors_origins case @is_prod do
+                  true ->
                     System.get_env("CORS_ORIGINS")
                     |> to_string()
                     |> String.split(~r/\s*,\s*/, trim: true)
-                  _ ->
+
+                  false ->
                     ["http://localhost:5173"]
                 end
 
@@ -41,7 +43,7 @@ defmodule ChatServerWeb.Endpoint do
   end
 
   # Optional: force HTTPS behind a proxy/LB
-  if config_env() == :prod do
+  if @is_prod do
     plug Plug.SSL, rewrite_on: [:x_forwarded_proto]
   end
 
