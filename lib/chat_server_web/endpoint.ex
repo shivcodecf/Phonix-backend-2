@@ -32,9 +32,7 @@ defmodule ChatServerWeb.Endpoint do
     websocket: true,
     longpoll: false
 
-  socket "/live", Phoenix.LiveView.Socket,
-    websocket: [connect_info: [session: @session_options]],
-    longpoll: false
+  
 
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
